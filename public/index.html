@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Requesty Tester</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Requesty Tester</h1>
+  <form id="key-form" class="key-form" autocomplete="off">
+    <label for="api-key" class="sr-only">API key</label>
+    <input id="api-key" type="password" placeholder="Requesty API key (sk-…)" spellcheck="false">
+    <label class="inline"><input id="remember-key" type="checkbox"> Remember</label>
+    <button type="submit">Load models</button>
+  </form>
+  <div id="models-status" class="muted small">No models loaded.</div>
+  <div class="topbar-links small">
+    <a href="https://app.requesty.ai/join?ref=b1f2b1e1" target="_blank" rel="noopener">No key? Sign up for Requesty</a>
+    <a href="https://github.com/hkarn/requesty-tester" target="_blank" rel="noopener">Source on GitHub</a>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="chat" class="active">Chat</button>
+  <button role="tab" data-tab="decision">Decision</button>
+  <button role="tab" data-tab="embeddings">Embeddings</button>
+  <button role="tab" data-tab="image">Image</button>
+  <button role="tab" data-tab="speech">Speech</button>
+  <button role="tab" data-tab="transcription">Transcriptions</button>
+  <button role="tab" data-tab="models">All models</button>
+</nav>
+
+<main>
+  <!-- CHAT -->
+  <section class="panel active" data-panel="chat">
+    <form class="request-form" data-kind="chat">
+      <div class="model-picker" data-category="chat"></div>
+      <label>System prompt
+        <textarea name="system" rows="2" placeholder="You are a helpful assistant."></textarea>
+      </label>
+      <div class="messages"></div>
+      <div class="row">
+        <button type="button" class="secondary add-message">+ Add message</button>
+      </div>
+      <div class="grid3">
+        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="2" placeholder="default"></label>
+        <label>Max tokens <input name="max_tokens" type="number" min="1" placeholder="default"></label>
+        <label>Top p <input name="top_p" type="number" step="0.05" min="0" max="1" placeholder="default"></label>
+      </div>
+      <details>
+        <summary>Extra JSON fields</summary>
+        <textarea name="extra" rows="3" class="mono" placeholder='{"stop": ["\n\n"]}'></textarea>
+      </details>
+      <button type="submit" class="primary">Send</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- DECISION -->
+  <section class="panel" data-panel="decision">
+    <form class="request-form" data-kind="decision">
+      <p class="muted small">Ask typed questions about a piece of content (<code>POST /v1/decisions</code>) and get a calibrated answer for each one.</p>
+      <div class="model-picker" data-category="decision"></div>
+      <label>State – the content to evaluate (plain text, or JSON)
+        <textarea name="state" rows="4" required>The dragon heist in this fantasy novel had me hooked, but the ending dragged a little.</textarea>
+      </label>
+      <label>Image (optional – only on models that accept images)
+        <input name="image" type="file" accept="image/*">
+      </label>
+      <div class="questions"></div>
+      <div class="row">
+        <button type="button" class="secondary add-question">+ Add question</button>
+      </div>
+      <button type="submit" class="primary">Decide</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- EMBEDDINGS -->
+  <section class="panel" data-panel="embeddings">
+    <form class="request-form" data-kind="embeddings">
+      <div class="model-picker" data-category="embedding"></div>
+      <label>Inputs (one per line – 2+ lines shows a similarity matrix)
+        <textarea name="input" rows="5" required>The cat sat on the mat.&#10;A kitten is resting on a rug.&#10;Stock prices fell sharply today.</textarea>
+      </label>
+      <div class="grid3">
+        <label>Dimensions <input name="dimensions" type="number" min="1" placeholder="default"></label>
+        <label>Encoding
+          <select name="encoding_format"><option value="">default</option><option>float</option><option>base64</option></select>
+        </label>
+      </div>
+      <button type="submit" class="primary">Embed</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- IMAGE -->
+  <section class="panel" data-panel="image">
+    <form class="request-form" data-kind="image">
+      <div class="model-picker" data-category="image"></div>
+      <label>Prompt
+        <textarea name="prompt" rows="3" required>A watercolor fox reading a newspaper in a café</textarea>
+      </label>
+      <div class="grid3">
+        <label>Size
+          <select name="size">
+            <option value="">default</option><option>auto</option>
+            <option selected>1024x1024</option><option>1024x1536</option><option>1536x1024</option>
+          </select>
+        </label>
+        <label>Count (n) <input name="n" type="number" min="1" max="10" value="1"></label>
+        <label>Quality
+          <select name="quality"><option value="">default</option><option>auto</option><option>low</option><option>medium</option><option>high</option></select>
+        </label>
+        <label>Background
+          <select name="background"><option value="">default</option><option>auto</option><option>transparent</option><option>opaque</option></select>
+        </label>
+        <label>Output format
+          <select name="output_format"><option value="">default</option><option>png</option><option>jpeg</option><option>webp</option></select>
+        </label>
+      </div>
+      <button type="submit" class="primary">Generate</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- SPEECH -->
+  <section class="panel" data-panel="speech">
+    <form class="request-form" data-kind="speech">
+      <div class="model-picker" data-category="speech"></div>
+      <label>Text
+        <textarea name="input" rows="3" maxlength="4096" required>Hello! This is a quick text-to-speech test through Requesty.</textarea>
+      </label>
+      <div class="grid3">
+        <label>Voice
+          <input name="voice" list="openai-voices" placeholder="model default" spellcheck="false">
+          <datalist id="openai-voices">
+            <option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
+            <option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option><option>verse</option>
+          </datalist>
+        </label>
+        <label>Format
+          <select name="response_format"><option>mp3</option><option>wav</option><option>opus</option><option>aac</option><option>flac</option><option>pcm</option></select>
+        </label>
+        <label>Speed <input name="speed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0"></label>
+      </div>
+      <p class="muted small">The suggested voices are OpenAI's, and OpenAI models need one. Other providers use their own voice names (e.g. <code>mimo_default</code> or <code>Chloe</code> for MiMo) and fail with a provider error on unknown ones. Leave it empty to use the model's default.</p>
+      <label><span>Instructions (optional, <code>openai/gpt-4o-mini-tts</code> only)</span>
+        <input name="instructions" placeholder="Speak in a cheerful, upbeat tone.">
+      </label>
+      <button type="submit" class="primary">Speak</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- TRANSCRIPTION -->
+  <section class="panel" data-panel="transcription">
+    <form class="request-form" data-kind="transcription">
+      <div class="model-picker" data-category="transcription"></div>
+      <label>Audio file
+        <input name="file" type="file" accept=".flac,.mp3,.mp4,.mpeg,.mpga,.m4a,.ogg,.wav,.webm,audio/*">
+      </label>
+      <div class="row">
+        <button type="button" class="secondary record-btn">● Record from mic</button>
+        <button type="button" class="secondary sample-btn">Use sample clip</button>
+        <span class="record-status muted small"></span>
+      </div>
+      <label>Language (ISO 639-1, optional)
+        <input name="language" placeholder="auto-detect (e.g. en, fr, ja)">
+      </label>
+      <button type="submit" class="primary">Transcribe</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- MODELS -->
+  <section class="panel" data-panel="models">
+    <div class="row">
+      <input id="model-filter" placeholder="Filter models…">
+      <span id="model-count" class="muted small"></span>
+    </div>
+    <div class="table-wrap"><table id="models-table"><thead></thead><tbody></tbody></table></div>
+    <details>
+      <summary>Raw /models response</summary>
+      <pre id="models-raw" class="mono"></pre>
+    </details>
+  </section>
+</main>
+
+<template id="question-row">
+  <fieldset class="question">
+    <div class="row">
+      <input class="qid" placeholder="id" spellcheck="false" size="10">
+      <select class="qtype">
+        <option value="noul">noul – yes/no probability</option>
+        <option value="choice">choice – pick one option</option>
+        <option value="score">score – ordered scale</option>
+      </select>
+      <button type="button" class="icon remove" title="Remove">✕</button>
+    </div>
+    <input class="qinstr" placeholder="Instructions, e.g. The review is positive.">
+    <textarea class="qcriteria mono" rows="3"></textarea>
+  </fieldset>
+</template>
+
+<template id="message-row">
+  <div class="message">
+    <select class="role"><option>user</option><option>assistant</option></select>
+    <textarea class="content" rows="2" placeholder="Message…"></textarea>
+    <button type="button" class="icon remove" title="Remove">✕</button>
+  </div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

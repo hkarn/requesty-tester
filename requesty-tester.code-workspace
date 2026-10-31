@@ -18,7 +18,6 @@
         "type": "node",
         "request": "launch",
         "program": "${workspaceFolder}/server.js",
-        "envFile": "${workspaceFolder}/.env",
         "console": "integratedTerminal",
         "serverReadyAction": {
           "pattern": "running at (https?://\\S+)",

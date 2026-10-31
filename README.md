@@ -1,6 +1,23 @@
 # Requesty Tester
 
-A small web UI for sending test requests to [Requesty](https://requesty.ai)'s router and inspecting what comes back.
+A web page for trying out [Requesty](https://requesty.ai), a router that puts many AI providers behind one API key. Pick a model, fill in a short form, send it, and see exactly what came back: the rendered answer, the raw JSON, the headers and a ready-to-run `curl` command. It covers chat, decisions, embeddings, image generation, text-to-speech and speech-to-text.
+
+**Try it at <https://hkarn.github.io/requesty-tester/>.** You need a Requesty API key. If you don't have one, you can [sign up through my referral link](https://app.requesty.ai/join?ref=b1f2b1e1) or directly at [requesty.ai](https://requesty.ai).
+
+## Two ways it runs
+
+The same page works with or without its small server, and picks the mode by itself: if `server.js` isn't there, it calls Requesty straight from the browser.
+
+| | With the server (`node server.js` or Docker) | Static only (e.g. GitHub Pages) |
+| --- | --- | --- |
+| Where requests go | Browser → your server → Requesty | Browser → Requesty |
+| Your API key | Typed into the page and sent with each request to your server, which passes it on to Requesty. The server doesn't store or log it. | Typed into the page and sent only to Requesty. No other server sees it. |
+| Server-side key | Optional: set `REQUESTY_API_KEY` so nobody has to type a key. Only do this on a private setup, since anyone who can open the page can then use your key. | Not possible |
+| Extras | Full response headers and upstream timing | Browsers show only a few response headers |
+
+In both modes the key stays in that browser tab, unless you tick **Remember**, which saves it in the browser's `localStorage` on that device.
+
+## What each tab does
 
 | Tab | Endpoint | What you get |
 | --- | --- | --- |
@@ -75,4 +92,4 @@ Compared with running `server.js`: there is no server-side `REQUESTY_API_KEY`, s
 
 ## How it works
 
-`server.js` serves the static UI from `public/` and forwards `/api/*` to the Requesty router. It passes the request body through byte-for-byte, so JSON, multipart audio uploads and binary audio responses all work, and it avoids browser CORS problems. The server never stores your key. If you tick **Remember**, the key is kept in your browser's `localStorage`.
+`server.js` serves the static UI from `public/` and forwards `/api/*` to the Requesty router. It passes the request body through byte-for-byte, so JSON, multipart audio uploads and binary audio responses all work. On load the page requests `config`. If that fails, there's no server, and the page sends its requests to `https://router.requesty.ai/v1` instead.

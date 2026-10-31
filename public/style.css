@@ -46,6 +46,9 @@ code, .mono, pre, textarea.mono { font-family: ui-monospace, SFMono-Regular, Men
 .topbar h1 { font-size: 17px; margin: 0; }
 .key-form { display: flex; gap: 8px; align-items: center; flex: 1 1 420px; }
 .key-form input[type=password], .key-form input[type=text] { flex: 1; min-width: 0; }
+.topbar-links { display: flex; gap: 16px; margin-left: auto; }
+.topbar-links a { color: var(--accent); text-decoration: none; }
+.topbar-links a:hover { text-decoration: underline; }
 
 .tabs {
   display: flex; gap: 2px; padding: 0 16px; overflow-x: auto;

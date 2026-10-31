@@ -27,7 +27,19 @@ const ENDPOINT = {
 const state = {
   models: [],         // raw model objects from /models
   upstream: 'https://router.requesty.ai/v1',
+  apiBase: null,      // 'api' through server.js, or the upstream URL when calling Requesty directly
 };
+
+// Use the server.js proxy when it serves the page. On a static host (e.g. GitHub Pages)
+// there is no `config`, so call Requesty directly, which allows CORS from any origin.
+// Paths are relative so the app also works from a subfolder.
+const serverConfig = fetch('config')
+  .then((r) => (r.ok ? r.json() : null))
+  .catch(() => null)
+  .then((cfg) => {
+    if (cfg?.upstream) { state.upstream = cfg.upstream; state.apiBase = 'api'; } else state.apiBase = state.upstream;
+    return cfg;
+  });
 
 /* ------------------------------------------------------------------ */
 /* Storage helpers (localStorage may be unavailable)                   */
@@ -61,15 +73,18 @@ const modelsIn = (category) => state.models.filter((m) => m._category === catego
 function apiKey() { return $('#api-key').value.trim(); }
 
 async function callApi(path, { method = 'POST', json, formData } = {}) {
+  await serverConfig;
   const headers = {};
   const key = apiKey();
   if (key) headers.Authorization = `Bearer ${key}`;
+  // server.js adds these itself; direct calls send them so Requesty can attribute the app.
+  if (state.apiBase !== 'api') Object.assign(headers, { 'HTTP-Referer': location.origin + location.pathname, 'X-Title': 'Requesty Tester' });
   let body;
   if (json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(json); }
   if (formData) body = formData;
 
   const t0 = performance.now();
-  const res = await fetch(`/api${path}`, { method, headers, body });
+  const res = await fetch(`${state.apiBase}${path}`, { method, headers, body });
   const ms = Math.round(performance.now() - t0);
   const contentType = res.headers.get('content-type') || '';
   const respHeaders = Object.fromEntries(res.headers.entries());
@@ -145,15 +160,6 @@ function renderException(container, err) {
 /* ------------------------------------------------------------------ */
 /* Model pickers                                                       */
 /* ------------------------------------------------------------------ */
-const PREFERRED = {
-  chat: [/gpt-4o-mini/, /gpt-4\.1-mini/, /claude.*haiku/, /gpt-4o/],
-  decision: [/gpt-6-luna/],
-  embedding: [/text-embedding-3-small/, /embedding/],
-  image: [/gpt-image-1$/, /gpt-image/],
-  speech: [/gpt-4o-mini-tts/, /tts-1$/],
-  transcription: [/gpt-4o-mini-transcribe/, /whisper-1/],
-};
-
 function setupPicker(picker) {
   const category = picker.dataset.category;
   const select = el('select', { name: 'model' });
@@ -175,11 +181,8 @@ function setupPicker(picker) {
       ...(list.length ? [] : [el('option', { value: '', text: state.models.length ? `No ${category} models detected – tick "show all"` : 'Load models first' })]),
       ...list.map((m) => el('option', { value: m.id, text: showAll.checked ? `${m.id}  [${m._category}]` : m.id })),
     );
+    // Keep the current choice; otherwise the first model in the list stays selected.
     if (list.some((m) => m.id === prev)) select.value = prev;
-    else {
-      const pick = (PREFERRED[category] || []).map((re) => list.find((m) => re.test(m.id))).find(Boolean);
-      if (pick) select.value = pick.id;
-    }
     showInfo();
   };
   const showInfo = () => {
@@ -194,6 +197,13 @@ function setupPicker(picker) {
     const outP = m.output_price ?? m.pricing?.output;
     if (inP != null) bits.push(`in ${perM(inP)}`);
     if (outP != null) bits.push(`out ${perM(outP)}`);
+    // Non-chat models only have per-unit keys in `pricing`, e.g. input_character, input_second, output_image.
+    if (inP == null && outP == null && m.pricing && !Array.isArray(m.pricing)) {
+      for (const [k, v] of Object.entries(m.pricing)) {
+        if (typeof v !== 'number') continue;
+        bits.push(k === 'input_second' ? `${k} $${+(v * 60).toPrecision(4)}/min` : `${k} ${perM(v)}`);
+      }
+    }
     if (m.geolocation) bits.push(m.geolocation);
     if (m.owned_by) bits.push(`by ${m.owned_by}`);
     if (m.description) bits.push(String(m.description).slice(0, 140));
@@ -525,9 +535,13 @@ function renderAnswer(id, a, q) {
     const nearest = labels[Math.round(Number(a.score))];
     box.append(el('div', {}, `score ${Number(a.score).toFixed(2)} / ${max}${nearest ? ` (≈ ${nearest})` : ''} `, meter(Number(a.score) / max)));
     if (a.confidence != null) box.append(el('div', {}, `confidence ${pct(a.confidence)} `, meter(a.confidence)));
-    if (Array.isArray(a.probabilities)) {
-      box.append(el('div', { class: 'score-dist' }, ...a.probabilities.map((p) => el('div', {},
-        el('span', { class: 'small', text: `${p.value}${labels[p.value] ? ` ${labels[p.value]}` : ''}` }), meter(p.probability), el('span', { class: 'small muted', text: ` ${pct(p.probability)}` })))));
+    // The spec documents [{value, probability}]; the live API returns {"0": p, …} plus a legend {"0": label, …}.
+    const dist = Array.isArray(a.probabilities) ? a.probabilities
+      : Object.entries(a.probabilities || {}).map(([value, probability]) => ({ value, probability }));
+    const labelOf = (v) => a.legend?.[v] ?? labels[v];
+    if (dist.length) {
+      box.append(el('div', { class: 'score-dist' }, ...dist.map((p) => el('div', {},
+        el('span', { class: 'small', text: `${p.value}${labelOf(p.value) != null ? ` ${labelOf(p.value)}` : ''}` }), meter(p.probability), el('span', { class: 'small muted', text: ` ${pct(p.probability)}` })))));
     }
   } else {
     box.append(pre(a));
@@ -580,6 +594,21 @@ function setupRecorder(form) {
   const btn = $('.record-btn', form);
   const status = $('.record-status', form);
   let recorder; let chunks = [];
+  // A recording or the sample clip is kept on the form and used when no file is chosen.
+  const useAudio = (file, label) => {
+    form._recording = file;
+    form.elements.file.value = '';
+    status.replaceChildren(`${label} ${(file.size / 1024).toFixed(1)} KB `, el('audio', { controls: '', src: URL.createObjectURL(file) }));
+  };
+  $('.sample-btn', form).addEventListener('click', async () => {
+    try {
+      const res = await fetch('sample.ogg');
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      useAudio(new File([await res.blob()], 'sample.ogg', { type: 'audio/ogg' }), 'Sample clip');
+    } catch (err) {
+      status.textContent = `Could not load the sample: ${err.message}`;
+    }
+  });
   btn.addEventListener('click', async () => {
     if (recorder?.state === 'recording') { recorder.stop(); return; }
     try {
@@ -591,10 +620,8 @@ function setupRecorder(form) {
         stream.getTracks().forEach((t) => t.stop());
         const type = recorder.mimeType || 'audio/webm';
         const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
-        form._recording = new File(chunks, `recording.${ext}`, { type });
-        form.elements.file.value = '';
         btn.textContent = '● Record from mic';
-        status.replaceChildren(`Recorded ${(form._recording.size / 1024).toFixed(1)} KB `, el('audio', { controls: '', src: URL.createObjectURL(form._recording) }));
+        useAudio(new File(chunks, `recording.${ext}`, { type }), 'Recorded');
       };
       recorder.start();
       btn.textContent = '■ Stop recording';
@@ -649,12 +676,17 @@ function init() {
     btn.disabled = true;
     const label = btn.textContent;
     btn.textContent = 'Sending…';
-    out.replaceChildren(el('div', { class: 'muted', text: 'Waiting for response…' }));
+    // Show elapsed time, since cold-starting provider models can take a minute.
+    const waiting = el('div', { class: 'muted', text: 'Waiting for response…' });
+    out.replaceChildren(waiting);
+    const t0 = Date.now();
+    const timer = setInterval(() => { waiting.textContent = `Waiting for response… ${Math.round((Date.now() - t0) / 1000)} s`; }, 1000);
     try {
       await handlers[form.dataset.kind](form, out);
     } catch (err) {
       renderException(out, err);
     } finally {
+      clearInterval(timer);
       btn.disabled = false;
       btn.textContent = label;
     }
@@ -662,11 +694,11 @@ function init() {
 
   $('#model-filter').addEventListener('input', renderModelsTable);
 
-  fetch('/config').then((r) => r.json()).then((cfg) => {
-    state.upstream = cfg.upstream || state.upstream;
-    if (cfg.hasEnvKey && !apiKey()) $('#api-key').placeholder = 'Using REQUESTY_API_KEY from server (optional override)';
-    if (apiKey() || cfg.hasEnvKey) loadModels();
-  }).catch(() => { if (apiKey()) loadModels(); });
+  serverConfig.then((cfg) => {
+    if (!cfg) $('#models-status').textContent = 'No models loaded. Calling Requesty directly from the browser.';
+    if (cfg?.hasEnvKey && !apiKey()) $('#api-key').placeholder = 'Using REQUESTY_API_KEY from server (optional override)';
+    if (apiKey() || cfg?.hasEnvKey) loadModels();
+  });
 }
 
 init();

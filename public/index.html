@@ -16,6 +16,10 @@
     <button type="submit">Load models</button>
   </form>
   <div id="models-status" class="muted small">No models loaded.</div>
+  <div class="topbar-links small">
+    <a href="https://app.requesty.ai/join?ref=b1f2b1e1" target="_blank" rel="noopener">No key? Sign up for Requesty</a>
+    <a href="https://github.com/hkarn/requesty-tester" target="_blank" rel="noopener">Source on GitHub</a>
+  </div>
 </header>
 
 <nav class="tabs" role="tablist">
@@ -79,7 +83,7 @@
     <form class="request-form" data-kind="embeddings">
       <div class="model-picker" data-category="embedding"></div>
       <label>Inputs (one per line – 2+ lines shows a similarity matrix)
-        <textarea name="input" rows="5" required placeholder="The cat sat on the mat.&#10;A kitten is resting on a rug.&#10;Stock prices fell sharply today."></textarea>
+        <textarea name="input" rows="5" required>The cat sat on the mat.&#10;A kitten is resting on a rug.&#10;Stock prices fell sharply today.</textarea>
       </label>
       <div class="grid3">
         <label>Dimensions <input name="dimensions" type="number" min="1" placeholder="default"></label>
@@ -97,7 +101,7 @@
     <form class="request-form" data-kind="image">
       <div class="model-picker" data-category="image"></div>
       <label>Prompt
-        <textarea name="prompt" rows="3" required placeholder="A watercolor fox reading a newspaper in a café"></textarea>
+        <textarea name="prompt" rows="3" required>A watercolor fox reading a newspaper in a café</textarea>
       </label>
       <div class="grid3">
         <label>Size
@@ -127,21 +131,23 @@
     <form class="request-form" data-kind="speech">
       <div class="model-picker" data-category="speech"></div>
       <label>Text
-        <textarea name="input" rows="3" maxlength="4096" required placeholder="Hello! This is a quick text-to-speech test through Requesty."></textarea>
+        <textarea name="input" rows="3" maxlength="4096" required>Hello! This is a quick text-to-speech test through Requesty.</textarea>
       </label>
       <div class="grid3">
         <label>Voice
-          <select name="voice">
-            <option selected>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
+          <input name="voice" list="openai-voices" placeholder="model default" spellcheck="false">
+          <datalist id="openai-voices">
+            <option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
             <option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option><option>verse</option>
-          </select>
+          </datalist>
         </label>
         <label>Format
           <select name="response_format"><option>mp3</option><option>wav</option><option>opus</option><option>aac</option><option>flac</option><option>pcm</option></select>
         </label>
         <label>Speed <input name="speed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0"></label>
       </div>
-      <label>Instructions (optional, <code>openai/gpt-4o-mini-tts</code> only)
+      <p class="muted small">The suggested voices are OpenAI's, and OpenAI models need one. Other providers use their own voice names (e.g. <code>mimo_default</code> or <code>Chloe</code> for MiMo) and fail with a provider error on unknown ones. Leave it empty to use the model's default.</p>
+      <label><span>Instructions (optional, <code>openai/gpt-4o-mini-tts</code> only)</span>
         <input name="instructions" placeholder="Speak in a cheerful, upbeat tone.">
       </label>
       <button type="submit" class="primary">Speak</button>
@@ -158,6 +164,7 @@
       </label>
       <div class="row">
         <button type="button" class="secondary record-btn">● Record from mic</button>
+        <button type="button" class="secondary sample-btn">Use sample clip</button>
         <span class="record-status muted small"></span>
       </div>
       <label>Language (ISO 639-1, optional)

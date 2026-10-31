@@ -25,7 +25,22 @@ A simple web tester for sending requests to Requesty in each category: Chat, Dec
 
 ## Testing so far
 - Tested only against a mock upstream that returns the documented response formats, because the cloud sandbox couldn't reach requesty.ai. All six tabs plus model loading passed end-to-end in headless Chromium with no console errors.
-- **Not yet done:** testing against the real API with a real key, and building the Docker image (the sandbox had no Docker daemon).
+- Local session (2026-10-31, Windows, Docker Desktop, no Node on the host): `docker build` works, and the container serves the UI and reports `healthy`. Against the real API without a key, `/models/all` returns 878 models whose `api` values are exactly the six documented ones. Errors come back as `{error:{origin:"router", message}}` (401 with no key, 403 with a bad key), as the spec says.
+- Real-data difference found and fixed: non-chat models have no `input_price`/`output_price`/`context_window`. Their `pricing` is an object of per-unit keys (embedding `input_text`/`input_image`/…, image `output_image`, speech `input_character`, transcription `input_second`; decision uses `input`/`output`). Chat models' `pricing` is an array of tiers. The model info line now shows the per-unit prices.
+- Real-key test (2026-10-31), all through the proxy, all 200 unless noted:
+  - Chat: `azure/gpt-5-nano`, `bedrock/claude-haiku-5-5`.
+  - Embeddings: all 3 approved models.
+  - Decision: all 4 approved models. The `score` answer differs from the spec: `probabilities` is an object keyed by index (`"0"`…) with a `legend` mapping index → label, and `score` is the expected index. The UI handles both shapes.
+  - Image: `vertex/google/gemini-2.5-flash-image` returns `data[].b64_json` plus token `usage`.
+  - Speech: `deepinfra/XiaomiMiMo/MiMo-V2.5-tts` gives `500 [provider]` for unknown voices such as `alloy`. It works with `mimo_default`, with `Chloe`, or with no voice at all. It returns WAV by default and MP3 when asked. The voice field is now optional free text.
+  - Transcriptions: all 3 DeepInfra models accept WAV, WebM/Opus and Ogg. The response also has `language`, `duration` and `segments`. The first Qwen3-ASR call took 56 s (likely a cold start).
+  - Unapproved models give a 403 from the router with a clear message.
+- End-to-end in headless Chromium (Playwright, with a WAV file as a fake mic): Embeddings, Image, Speech and Transcriptions all render results. Transcriptions was tested with the sample clip, a mic recording and a file upload. Embeddings, Image and Speech now start with example values, and Transcriptions has a "Use sample clip" button (`public/sample.ogg`, generated with MiMo TTS).
+- With the user's real mic, `deepinfra/nvidia/Nemotron-…` returned no text, though it handles the English test clips. It was selected only because it sorts first. There are no preferred models any more, because the models a key exposes vary too much: each picker keeps the current choice and otherwise selects the first model.
+
+## Static mode (GitHub Pages)
+- `app.js` requests `config` (relative) on load. If `server.js` answers, calls go through `api/…`. Otherwise they go straight to `https://router.requesty.ai/v1`, with `HTTP-Referer` and `X-Title` set in the browser. Requesty answers preflights with `Access-Control-Allow-Origin: *` and allows these headers.
+- `.github/workflows/pages.yml` publishes `public/` to Pages. Tested in headless Chromium against nginx serving `public/` from `/requesty-tester/`: all six tabs work.
 
 ## Suggested next steps
 1. `node server.js`, open http://127.0.0.1:3000, paste a key, and check each tab against the real API. Watch for differences from the spec, e.g. what `/models/all` returns for this organization, image response fields, and the transcription usage shape.

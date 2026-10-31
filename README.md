@@ -32,7 +32,7 @@ Or, without compose:
 docker run --rm -p 127.0.0.1:3000:3000 ghcr.io/hkarn/requesty-tester:latest
 ```
 
-Optional: put `REQUESTY_API_KEY=sk-...` in a `.env` file next to `docker-compose.yml` so you don't have to type the key. A key typed in the UI always takes precedence.
+Optional: copy `.env.example` to `.env` and set `REQUESTY_API_KEY=sk-...` so you don't have to type the key. A key typed in the UI always takes precedence.
 
 To build from source, switch `image:` to `build: .` in `docker-compose.yml`, or run:
 
@@ -58,6 +58,20 @@ node server.js
 | `REQUESTY_BASE_URL` | `https://router.requesty.ai/v1` | Upstream API (e.g. a regional endpoint) |
 | `PORT` | `3000` | Listen port |
 | `HOST` | `127.0.0.1` (`0.0.0.0` in Docker) | Listen address |
+
+## Hosting it publicly
+
+Any host that runs Node 18 or later works. Upload `server.js`, `package.json` and `public/`, and set the start file to `server.js`. `PORT` can be a port number or a pipe/socket path, as some hosts (iisnode, Passenger) provide. If the host connects to the app over TCP from another machine, set `HOST=0.0.0.0`.
+
+**Don't set `REQUESTY_API_KEY` on a public site.** Anyone who opens it could then send requests billed to your key. Without it, every visitor uses their own key, which stays in their browser and passes through the server per request. Request bodies are capped at 40 MB.
+
+## GitHub Pages (static, no server)
+
+Requesty allows CORS from any origin, so `public/` also works as a static site. When the page finds no `server.js` (its `config` request fails), it calls `https://router.requesty.ai/v1` directly from the browser. All paths are relative, so it works from a subfolder such as `https://<owner>.github.io/requesty-tester/`.
+
+The `GitHub Pages` workflow publishes `public/` on every push to `main` that changes it. Enable it once under **Settings → Pages → Source: GitHub Actions**.
+
+Compared with running `server.js`: there is no server-side `REQUESTY_API_KEY`, so each visitor pastes their own key. Browsers also only expose a few response headers on cross-origin calls, so the response-headers view is shorter and there's no upstream timing.
 
 ## How it works
 

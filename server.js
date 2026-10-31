@@ -14,7 +14,9 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PORT = Number(process.env.PORT) || 3000;
+// Some hosts (iisnode, Passenger) pass a pipe or socket path instead of a port number.
+const PORT = process.env.PORT || 3000;
+const IS_TCP_PORT = /^\d+$/.test(String(PORT));
 const HOST = process.env.HOST || '127.0.0.1';
 const UPSTREAM = (process.env.REQUESTY_BASE_URL || 'https://router.requesty.ai/v1').replace(/\/+$/, '');
 const ENV_KEY = process.env.REQUESTY_API_KEY || '';
@@ -26,17 +28,31 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.ogg': 'audio/ogg',
 };
 
 // Request headers we pass on to Requesty.
 const FORWARD_REQ_HEADERS = ['authorization', 'content-type', 'accept', 'http-referer', 'x-title'];
 // Response headers we drop (Node recomputes these, or fetch already decoded the body).
 const DROP_RES_HEADERS = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);
+// Transcription uploads can be up to 32 MB; leave room for the multipart overhead.
+const MAX_BODY_BYTES = 40 * 1024 * 1024;
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        // Stop buffering but keep draining, so the 413 response can still reach the client.
+        req.removeAllListeners('data');
+        req.resume();
+        reject(Object.assign(new Error('Request body too large'), { status: 413 }));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
@@ -49,7 +65,8 @@ async function proxy(req, res) {
     if (req.headers[h]) headers[h] = req.headers[h];
   }
   if (!headers.authorization && ENV_KEY) headers.authorization = `Bearer ${ENV_KEY}`;
-  headers['http-referer'] ||= `http://${HOST}:${PORT}`;
+  const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0];
+  headers['http-referer'] ||= `${proto}://${req.headers.host || `${HOST}:${PORT}`}`;
   headers['x-title'] ||= 'Requesty Tester';
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
@@ -71,6 +88,12 @@ async function proxy(req, res) {
     res.end(buf);
     console.log(`${req.method} ${target} -> ${upstream.status} (${Date.now() - started} ms)`);
   } catch (err) {
+    if (err.status === 413) {
+      console.warn(`${req.method} ${target} rejected: ${err.message}`);
+      res.writeHead(413, { 'content-type': 'application/json', connection: 'close' });
+      res.end(JSON.stringify({ error: { message: `Request body is larger than ${MAX_BODY_BYTES / 1024 / 1024} MB` } }));
+      return;
+    }
     console.error(`${req.method} ${target} failed:`, err);
     res.writeHead(502, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: { message: `Proxy could not reach ${target}: ${err.message}` } }));
@@ -105,7 +128,7 @@ http
       serveStatic(req, res);
     }
   })
-  .listen(PORT, HOST, () => {
-    console.log(`Requesty Tester running at http://${HOST}:${PORT}`);
+  .listen(...(IS_TCP_PORT ? [Number(PORT), HOST] : [PORT]), () => {
+    console.log(`Requesty Tester running at ${IS_TCP_PORT ? `http://${HOST}:${PORT}` : PORT}`);
     console.log(`Proxying /api/* -> ${UPSTREAM}${ENV_KEY ? ' (REQUESTY_API_KEY set)' : ''}`);
   });

@@ -141,20 +141,17 @@
       <label>Text
         <textarea name="input" rows="3" maxlength="4096" required>Hello! This is a quick text-to-speech test through Requesty.</textarea>
       </label>
+      <div class="voice-picker">
+        <label>Voice <select name="voice_preset"></select></label>
+        <input name="voice" placeholder="or type a voice name (overrides the list)" spellcheck="false">
+        <div class="voice-note muted small"></div>
+      </div>
       <div class="grid3">
-        <label>Voice
-          <input name="voice" list="openai-voices" placeholder="model default" spellcheck="false">
-          <datalist id="openai-voices">
-            <option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
-            <option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option><option>verse</option>
-          </datalist>
-        </label>
         <label>Format
           <select name="response_format"><option>mp3</option><option>wav</option><option>opus</option><option>aac</option><option>flac</option><option>pcm</option></select>
         </label>
         <label>Speed <input name="speed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0"></label>
       </div>
-      <p class="muted small">The suggested voices are OpenAI's, and OpenAI models need one. Other providers use their own voice names (e.g. <code>mimo_default</code> or <code>Chloe</code> for MiMo) and fail with a provider error on unknown ones. Leave it empty to use the model's default.</p>
       <label><span>Instructions (optional, <code>openai/gpt-4o-mini-tts</code> only)</span>
         <input name="instructions" placeholder="Speak in a cheerful, upbeat tone.">
       </label>

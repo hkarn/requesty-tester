@@ -183,7 +183,8 @@ function setupPicker(picker) {
     );
     // Keep the current choice; otherwise the first model in the list stays selected.
     if (list.some((m) => m.id === prev)) select.value = prev;
-    showInfo();
+    // Bubbles so the form can react to the new model, e.g. the speech voice list.
+    select.dispatchEvent(new Event('change', { bubbles: true }));
   };
   const showInfo = () => {
     const m = state.models.find((x) => x.id === select.value);
@@ -270,6 +271,65 @@ function renderModelsTable() {
     ...cols.map((c) => el('td', { text: m[c] == null ? '' : String(m[c]) })),
   )));
   $('#model-count').textContent = `${rows.length} of ${state.models.length}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Speech voices                                                       */
+/* ------------------------------------------------------------------ */
+// /models/all has no voice names, so they are kept here, taken from each provider's docs.
+// The first matching entry wins. `groups` maps an optgroup label (or '' for none) to voices.
+// `def` is the provider's default voice. `required` means the API rejects a request without a voice.
+const OPENAI_TTS1_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer'];
+const SPEECH_VOICES = [
+  { match: /^openai\/tts-1/, required: true, groups: { '': OPENAI_TTS1_VOICES },
+    note: 'tts-1 and tts-1-hd support 9 voices. ballad, verse, marin and cedar are gpt-4o-mini-tts only.' },
+  { match: /^openai\//, required: true, groups: { '': ['marin', 'cedar', ...OPENAI_TTS1_VOICES, 'ballad', 'verse'] },
+    note: 'OpenAI recommends marin or cedar for best quality.' },
+  { match: /kokoro/i, def: 'af_bella', groups: {
+    'American English': ['af_heart', 'af_alloy', 'af_aoede', 'af_bella', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky',
+      'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa'],
+    'British English': ['bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis'],
+    Japanese: ['jf_alpha', 'jf_gongitsune', 'jf_nezumi', 'jf_tebukuro', 'jm_kumo'],
+    'Mandarin Chinese': ['zf_xiaobei', 'zf_xiaoni', 'zf_xiaoxiao', 'zf_xiaoyi', 'zm_yunjian', 'zm_yunxi', 'zm_yunxia', 'zm_yunyang'],
+    Spanish: ['ef_dora', 'em_alex', 'em_santa'],
+    French: ['ff_siwis'],
+    Hindi: ['hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi'],
+    Italian: ['if_sara', 'im_nicola'],
+    'Brazilian Portuguese': ['pf_dora', 'pm_alex', 'pm_santa'],
+  }, note: 'The second letter is f for female, m for male. Pick a voice that matches the language of the text.' },
+  { match: /orpheus/i, def: 'tara', groups: { '': ['tara', 'leah', 'jess', 'leo', 'dan', 'mia', 'zac', 'zoe'] },
+    note: 'English voices, listed from most to least natural. Emotive tags like <laugh> or <sigh> work in the text.' },
+  { match: /mimo.*tts/i, def: 'mimo_default', groups: { English: ['Mia', 'Chloe', 'Milo', 'Dean'], Chinese: ['冰糖', '茉莉', '苏打', '白桦'] },
+    note: 'mimo_default is Mia outside China.' },
+  { match: /voicedesign/i, groups: {}, placeholder: 'describe the voice, e.g. A deep male voice with a calm, authoritative tone',
+    note: 'No preset voices. Describe the voice you want in the text box.' },
+  { match: /chatterbox/i, groups: {}, note: 'No preset voices. Chatterbox takes the ID of a voice cloned on DeepInfra. Leave it empty for the default voice.' },
+  { match: /csm-1b/i, groups: {}, note: 'No documented preset voices. Leave it empty for the default voice.' },
+];
+
+// Fills the voice dropdown for the chosen model. Called whenever the model changes.
+function setupVoicePicker(form) {
+  const select = form.elements.voice_preset;
+  const custom = form.elements.voice;
+  const note = $('.voice-note', form);
+  const update = () => {
+    const model = chosenModel(form);
+    const entry = SPEECH_VOICES.find((v) => v.match.test(model));
+    const groups = Object.entries(entry?.groups || {});
+    select.replaceChildren(
+      ...(entry?.required ? [] : [el('option', { value: '', text: entry?.def ? `model default (${entry.def})` : 'model default' })]),
+      ...groups.map(([label, voices]) => {
+        const options = voices.map((v) => el('option', { value: v, text: v }));
+        return label ? el('optgroup', { label }, ...options) : options;
+      }).flat(),
+    );
+    select.disabled = !groups.length;
+    custom.placeholder = entry?.placeholder || 'or type a voice name (overrides the list)';
+    note.textContent = entry?.note || (model ? 'No voice list for this model. Type a voice name or leave it empty for the default.' : '');
+  };
+  form.addEventListener('change', (e) => { if (e.target.name === 'model') update(); });
+  form.addEventListener('input', (e) => { if (e.target.name === 'model_custom') update(); });
+  update();
 }
 
 /* ------------------------------------------------------------------ */
@@ -419,7 +479,8 @@ const handlers = {
 
   async speech(form, out) {
     const body = compact({
-      model: chosenModel(form), input: form.elements.input.value.trim(), voice: str(form, 'voice'),
+      // A typed voice overrides the dropdown.
+      model: chosenModel(form), input: form.elements.input.value.trim(), voice: str(form, 'voice') || str(form, 'voice_preset'),
       response_format: str(form, 'response_format'), speed: num(form, 'speed'), instructions: str(form, 'instructions'),
     });
     const resp = await callApi(ENDPOINT.speech, { json: body });
@@ -662,6 +723,7 @@ function init() {
   addMessage(chatForm, 'user', 'Say hello and tell me which model you are.');
   $('.add-message', chatForm).addEventListener('click', () => addMessage(chatForm));
   setupRecorder($('form[data-kind=transcription]'));
+  setupVoicePicker($('form[data-kind=speech]'));
   const decisionForm = $('form[data-kind=decision]');
   addQuestion(decisionForm, { id: 'positive', type: 'noul', instructions: 'The review is positive.' });
   addQuestion(decisionForm, { id: 'genre', type: 'choice', instructions: 'Which genre is the book?', criteria: 'fantasy: Magic, myth or invented worlds\nmystery: A crime or puzzle to solve\nromance: A love story' });

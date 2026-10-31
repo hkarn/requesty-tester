@@ -53,6 +53,7 @@
   },
   "extensions": {
     "recommendations": [
+      "anthropic.claude-code",
       "ms-azuretools.vscode-docker",
       "github.vscode-github-actions"
     ]

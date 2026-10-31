@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Requesty Tester</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Requesty Tester</h1>
+  <form id="key-form" class="key-form" autocomplete="off">
+    <label for="api-key" class="sr-only">API key</label>
+    <input id="api-key" type="password" placeholder="Requesty API key (sk-…)" spellcheck="false">
+    <label class="inline"><input id="remember-key" type="checkbox"> Remember</label>
+    <button type="submit">Load models</button>
+  </form>
+  <div id="models-status" class="muted small">No models loaded.</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="chat" class="active">Chat</button>
+  <button role="tab" data-tab="decision">Decision</button>
+  <button role="tab" data-tab="embeddings">Embeddings</button>
+  <button role="tab" data-tab="image">Image</button>
+  <button role="tab" data-tab="speech">Speech</button>
+  <button role="tab" data-tab="transcription">Transcriptions</button>
+  <button role="tab" data-tab="models">All models</button>
+</nav>
+
+<main>
+  <!-- CHAT -->
+  <section class="panel active" data-panel="chat">
+    <form class="request-form" data-kind="chat">
+      <div class="model-picker" data-category="chat"></div>
+      <label>System prompt
+        <textarea name="system" rows="2" placeholder="You are a helpful assistant."></textarea>
+      </label>
+      <div class="messages"></div>
+      <div class="row">
+        <button type="button" class="secondary add-message">+ Add message</button>
+      </div>
+      <div class="grid3">
+        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="2" placeholder="default"></label>
+        <label>Max tokens <input name="max_tokens" type="number" min="1" placeholder="default"></label>
+        <label>Top p <input name="top_p" type="number" step="0.05" min="0" max="1" placeholder="default"></label>
+      </div>
+      <details>
+        <summary>Extra JSON fields</summary>
+        <textarea name="extra" rows="3" class="mono" placeholder='{"stop": ["\n\n"]}'></textarea>
+      </details>
+      <button type="submit" class="primary">Send</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- DECISION -->
+  <section class="panel" data-panel="decision">
+    <form class="request-form" data-kind="decision">
+      <p class="muted small">Asks a chat model to pick exactly one of your options and return structured JSON
+        (<code>decision</code>, <code>confidence</code>, <code>reasoning</code>).</p>
+      <div class="model-picker" data-category="chat"></div>
+      <label>Question / context
+        <textarea name="question" rows="4" required placeholder="A customer writes: &quot;I was charged twice this month.&quot; Which team should handle this?"></textarea>
+      </label>
+      <label>Options (one per line)
+        <textarea name="options" rows="4" required placeholder="billing&#10;technical support&#10;sales&#10;other"></textarea>
+      </label>
+      <div class="grid3">
+        <label>Output mode
+          <select name="mode">
+            <option value="json_schema">json_schema (strict)</option>
+            <option value="json_object">json_object</option>
+            <option value="prompt">Prompt only</option>
+          </select>
+        </label>
+        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="2" value="0"></label>
+        <label class="inline"><input name="reasoning" type="checkbox" checked> Ask for reasoning</label>
+      </div>
+      <button type="submit" class="primary">Decide</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- EMBEDDINGS -->
+  <section class="panel" data-panel="embeddings">
+    <form class="request-form" data-kind="embeddings">
+      <div class="model-picker" data-category="embeddings"></div>
+      <label>Inputs (one per line – 2+ lines shows a similarity matrix)
+        <textarea name="input" rows="5" required placeholder="The cat sat on the mat.&#10;A kitten is resting on a rug.&#10;Stock prices fell sharply today."></textarea>
+      </label>
+      <div class="grid3">
+        <label>Dimensions <input name="dimensions" type="number" min="1" placeholder="default"></label>
+        <label>Encoding
+          <select name="encoding_format"><option value="">default</option><option>float</option><option>base64</option></select>
+        </label>
+      </div>
+      <button type="submit" class="primary">Embed</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- IMAGE -->
+  <section class="panel" data-panel="image">
+    <form class="request-form" data-kind="image">
+      <div class="model-picker" data-category="image"></div>
+      <label>Prompt
+        <textarea name="prompt" rows="3" required placeholder="A watercolor fox reading a newspaper in a café"></textarea>
+      </label>
+      <div class="grid3">
+        <label>Size
+          <select name="size">
+            <option value="">default</option><option>256x256</option><option>512x512</option>
+            <option selected>1024x1024</option><option>1024x1536</option><option>1536x1024</option>
+            <option>1792x1024</option><option>1024x1792</option>
+          </select>
+        </label>
+        <label>Count (n) <input name="n" type="number" min="1" max="10" value="1"></label>
+        <label>Quality
+          <select name="quality"><option value="">default</option><option>low</option><option>medium</option><option>high</option><option>standard</option><option>hd</option></select>
+        </label>
+        <label>Response format
+          <select name="response_format"><option value="">default</option><option>b64_json</option><option>url</option></select>
+        </label>
+      </div>
+      <button type="submit" class="primary">Generate</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- SPEECH -->
+  <section class="panel" data-panel="speech">
+    <form class="request-form" data-kind="speech">
+      <div class="model-picker" data-category="speech"></div>
+      <label>Text
+        <textarea name="input" rows="3" required placeholder="Hello! This is a quick text-to-speech test through Requesty."></textarea>
+      </label>
+      <div class="grid3">
+        <label>Voice
+          <input name="voice" list="voices" value="alloy">
+          <datalist id="voices">
+            <option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
+            <option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option><option>verse</option>
+          </datalist>
+        </label>
+        <label>Format
+          <select name="response_format"><option>mp3</option><option>wav</option><option>opus</option><option>aac</option><option>flac</option><option>pcm</option></select>
+        </label>
+        <label>Speed <input name="speed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0"></label>
+      </div>
+      <label>Instructions (optional, some models only)
+        <input name="instructions" placeholder="Speak in a cheerful, upbeat tone.">
+      </label>
+      <button type="submit" class="primary">Speak</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- TRANSCRIPTION -->
+  <section class="panel" data-panel="transcription">
+    <form class="request-form" data-kind="transcription">
+      <div class="model-picker" data-category="transcription"></div>
+      <label>Audio file
+        <input name="file" type="file" accept="audio/*,video/*">
+      </label>
+      <div class="row">
+        <button type="button" class="secondary record-btn">● Record from mic</button>
+        <span class="record-status muted small"></span>
+      </div>
+      <div class="grid3">
+        <label>Language <input name="language" placeholder="auto (e.g. en)"></label>
+        <label>Response format
+          <select name="response_format"><option>json</option><option>text</option><option>verbose_json</option><option>srt</option><option>vtt</option></select>
+        </label>
+        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="1" placeholder="default"></label>
+      </div>
+      <label>Prompt (optional context / spelling hints)
+        <input name="prompt" placeholder="Requesty, OpenRouter, Anthropic">
+      </label>
+      <button type="submit" class="primary">Transcribe</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- MODELS -->
+  <section class="panel" data-panel="models">
+    <div class="row">
+      <input id="model-filter" placeholder="Filter models…">
+      <span id="model-count" class="muted small"></span>
+    </div>
+    <div class="table-wrap"><table id="models-table"><thead></thead><tbody></tbody></table></div>
+    <details>
+      <summary>Raw /models response</summary>
+      <pre id="models-raw" class="mono"></pre>
+    </details>
+  </section>
+</main>
+
+<template id="message-row">
+  <div class="message">
+    <select class="role"><option>user</option><option>assistant</option></select>
+    <textarea class="content" rows="2" placeholder="Message…"></textarea>
+    <button type="button" class="icon remove" title="Remove">✕</button>
+  </div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

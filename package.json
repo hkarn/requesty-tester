@@ -1,0 +1,12 @@
+{
+  "name": "requesty-tester",
+  "version": "1.0.0",
+  "description": "Small web UI for testing Requesty endpoints: chat, decision, embeddings, image, speech, transcriptions.",
+  "private": true,
+  "license": "MIT",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

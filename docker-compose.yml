@@ -1,0 +1,13 @@
+services:
+  requesty-tester:
+    image: ghcr.io/hkarn/requesty-tester:latest
+    # Uncomment to build from source instead of pulling the published image:
+    # build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      # Optional: preset a key so the UI works without typing one.
+      # Put REQUESTY_API_KEY=sk-... in a .env file next to this file.
+      REQUESTY_API_KEY: ${REQUESTY_API_KEY:-}
+      REQUESTY_BASE_URL: ${REQUESTY_BASE_URL:-https://router.requesty.ai/v1}
+    restart: unless-stopped

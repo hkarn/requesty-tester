@@ -5,14 +5,14 @@ A small web UI for sending test requests to [Requesty](https://requesty.ai)'s ro
 | Tab | Endpoint | What you get |
 | --- | --- | --- |
 | **Chat** | `POST /v1/chat/completions` | Multi-turn message builder (system + user/assistant), temperature/max_tokens/top_p, extra JSON fields |
-| **Decision** | `POST /v1/chat/completions` with `response_format` | Give a question and a list of options. The model picks one and returns `{decision, confidence, reasoning}` as structured JSON |
+| **Decision** | `POST /v1/decisions` | Content (`state`, optionally with an image) plus typed questions (`noul` yes/no, `choice`, `score`), with calibrated answers and probability bars |
 | **Embeddings** | `POST /v1/embeddings` | One input per line, shows vector previews and a cosine-similarity matrix |
-| **Image** | `POST /v1/images/generations` | Renders the returned images (`b64_json` or `url`) |
+| **Image** | `POST /v1/images/generations` | Size, n, quality, background and output format. Renders the returned images |
 | **Speech** | `POST /v1/audio/speech` | Plays the audio in the browser and lets you download it |
-| **Transcriptions** | `POST /v1/audio/transcriptions` | Upload a file or record from your mic |
-| **All models** | `GET /v1/models` | Searchable table plus the raw response |
+| **Transcriptions** | `POST /v1/audio/transcriptions` | Upload a file (≤ 32 MB) or record from your mic, with optional language |
+| **All models** | `GET /v1/models/all` | Searchable table plus the raw response |
 
-Paste your API key and click **Load models**. Each tab's model dropdown only lists models that look like they belong to that category, based on metadata in `/models` and falling back to the model name. Tick **show all** or type any model ID to override that.
+Paste your API key and click **Load models**. Models come from `GET /v1/models/all`, which only returns the models approved for your key's organization. Each tab's dropdown is filtered by the model's `api` field (`chat`, `decision`, `embedding`, `image`, `speech`, `transcription`). Tick **show all** or type any model ID to override that.
 
 Every response shows the status, latency, rendered output, raw response, request body, response headers and a ready-to-run `curl` command.
 

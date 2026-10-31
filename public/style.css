@@ -121,3 +121,11 @@ td.sim { text-align: center; font-variant-numeric: tabular-nums; }
 #models-table thead th { position: sticky; top: 0; background: var(--surface); }
 #model-filter { flex: 1; max-width: 420px; }
 .cat { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--highlight); }
+
+.questions { display: flex; flex-direction: column; gap: 10px; }
+.question { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.question .row select { flex: 1; }
+.answer { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; white-space: normal; }
+.answer .cat { margin-left: 8px; }
+.score-dist { display: grid; gap: 2px; }
+.score-dist > div { display: grid; grid-template-columns: 120px 160px auto; align-items: center; gap: 6px; }

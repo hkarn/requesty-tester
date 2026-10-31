@@ -15,11 +15,12 @@ const el = (tag, attrs = {}, ...children) => {
   return node;
 };
 
+// Category keys match the `api` field Requesty returns from GET /v1/models/all.
 const CATEGORY_LABEL = {
-  chat: 'Chat', embeddings: 'Embeddings', image: 'Image', speech: 'Speech', transcription: 'Transcription',
+  chat: 'Chat', decision: 'Decision', embedding: 'Embeddings', image: 'Image', speech: 'Speech', transcription: 'Transcription',
 };
 const ENDPOINT = {
-  chat: '/chat/completions', decision: '/chat/completions', embeddings: '/embeddings',
+  chat: '/chat/completions', decision: '/decisions', embeddings: '/embeddings',
   image: '/images/generations', speech: '/audio/speech', transcription: '/audio/transcriptions',
 };
 
@@ -40,27 +41,15 @@ const store = {
 /* ------------------------------------------------------------------ */
 /* Model categorisation                                                */
 /* ------------------------------------------------------------------ */
-// Requesty's /models response is OpenAI-style ({data:[{id,...}]}) and may carry
-// extra metadata. We first look for explicit type/modality fields, then fall back
-// to well-known model-name patterns.
+// GET /v1/models/all tags every model with its modality in `api`. The name-based
+// fallback only kicks in for entries without that field.
 function categorize(model) {
-  const id = String(model.id || model.name || '').toLowerCase();
-  const hints = [
-    model.type, model.model_type, model.mode, model.api, model.category, model.task,
-    model.endpoint, model.endpoints, model.supported_endpoints,
-    model.output_modalities, model.architecture?.output_modalities, model.architecture?.modality,
-  ].filter((x) => x != null).map((x) => JSON.stringify(x).toLowerCase()).join(' ');
-
-  if (hints) {
-    if (/embed/.test(hints)) return 'embeddings';
-    if (/transcri|speech-to-text|stt|audio\/transcriptions/.test(hints)) return 'transcription';
-    if (/text-to-speech|\btts\b|audio\/speech|"speech"/.test(hints)) return 'speech';
-    if (/images\/generations|image[_-]?generation|->\s*image|"image"\]?$/.test(hints)) return 'image';
-  }
-  if (/embed/.test(id)) return 'embeddings';
-  if (/whisper|transcri|speech-to-text|\bstt\b|scribe|\basr\b/.test(id)) return 'transcription';
-  if (/tts|text-to-speech|eleven_|elevenlabs|\/speech/.test(id)) return 'speech';
-  if (/dall-e|gpt-image|imagen|flux|stable-diffusion|\bsdxl?\b|ideogram|recraft|midjourney|-image(-|$)|image-gen|seedream/.test(id)) return 'image';
+  if (model.api && CATEGORY_LABEL[model.api]) return model.api;
+  const id = String(model.id || '').toLowerCase();
+  if (/embed/.test(id)) return 'embedding';
+  if (/whisper|transcribe/.test(id)) return 'transcription';
+  if (/tts/.test(id)) return 'speech';
+  if (/gpt-image|dall-e|imagen|flux/.test(id)) return 'image';
   return 'chat';
 }
 
@@ -100,6 +89,7 @@ async function callApi(path, { method = 'POST', json, formData } = {}) {
 
 function errorMessage(resp) {
   const d = resp.data;
+  if (d?.error?.message) return `${d.error.origin ? `[${d.error.origin}] ` : ''}${d.error.message}`;
   if (d && typeof d === 'object') return d.error?.message || d.message || d.detail || JSON.stringify(d.error || d);
   return typeof d === 'string' && d ? d : `${resp.status} ${resp.statusText}`;
 }
@@ -157,10 +147,11 @@ function renderException(container, err) {
 /* ------------------------------------------------------------------ */
 const PREFERRED = {
   chat: [/gpt-4o-mini/, /gpt-4\.1-mini/, /claude.*haiku/, /gpt-4o/],
-  embeddings: [/text-embedding-3-small/, /embedding/],
-  image: [/gpt-image-1/, /dall-e-3/],
-  speech: [/gpt-4o-mini-tts/, /tts-1/],
-  transcription: [/whisper-1/, /gpt-4o-mini-transcribe/],
+  decision: [/gpt-6-luna/],
+  embedding: [/text-embedding-3-small/, /embedding/],
+  image: [/gpt-image-1$/, /gpt-image/],
+  speech: [/gpt-4o-mini-tts/, /tts-1$/],
+  transcription: [/gpt-4o-mini-transcribe/, /whisper-1/],
 };
 
 function setupPicker(picker) {
@@ -198,10 +189,12 @@ function setupPicker(picker) {
     const bits = [];
     const ctx = m.context_window ?? m.context_length ?? m.max_context_length;
     if (ctx) bits.push(`context ${Number(ctx).toLocaleString()}`);
-    const inP = m.input_price ?? m.pricing?.prompt ?? m.pricing?.input;
-    const outP = m.output_price ?? m.pricing?.completion ?? m.pricing?.output;
-    if (inP != null) bits.push(`in $${inP}`);
-    if (outP != null) bits.push(`out $${outP}`);
+    const perM = (x) => `$${+(Number(x) * 1e6).toPrecision(4)}/M`;
+    const inP = m.input_price ?? m.pricing?.input;
+    const outP = m.output_price ?? m.pricing?.output;
+    if (inP != null) bits.push(`in ${perM(inP)}`);
+    if (outP != null) bits.push(`out ${perM(outP)}`);
+    if (m.geolocation) bits.push(m.geolocation);
     if (m.owned_by) bits.push(`by ${m.owned_by}`);
     if (m.description) bits.push(String(m.description).slice(0, 140));
     info.append(bits.join(' · '), ' ', el('details', {}, el('summary', { class: 'small', text: 'model metadata' }), pre(stripPrivate(m))));
@@ -232,7 +225,7 @@ async function loadModels() {
   btn.disabled = true;
   status.textContent = 'Loading models…';
   try {
-    const resp = await callApi('/models', { method: 'GET' });
+    const resp = await callApi('/models/all', { method: 'GET' });
     $('#models-raw').textContent = JSON.stringify(resp.data, null, 2);
     if (!resp.ok) throw new Error(errorMessage(resp));
     const list = Array.isArray(resp.data) ? resp.data : (resp.data?.data || resp.data?.models || []);
@@ -256,9 +249,10 @@ function renderModelsTable() {
   const filter = $('#model-filter').value.trim().toLowerCase();
   const rows = state.models.filter((m) => !filter || JSON.stringify(m).toLowerCase().includes(filter));
   // Show a handful of common scalar columns that actually exist in the data.
-  const candidates = ['owned_by', 'context_window', 'context_length', 'max_output_tokens', 'input_price', 'output_price',
-    'caching_price', 'cached_price', 'supports_vision', 'supports_tool_calls', 'supports_reasoning', 'supports_caching'];
+  const candidates = ['context_window', 'max_output_tokens', 'input_price', 'output_price', 'cached_price',
+    'supports_vision', 'supports_tool_calling', 'supports_reasoning', 'supports_caching', 'supports_output_json_schema'];
   const cols = candidates.filter((c) => state.models.some((m) => m[c] != null && typeof m[c] !== 'object'));
+  cols.splice(0, 0, ...['geolocation'].filter((c) => state.models.some((m) => m[c] != null)));
   table.tHead.replaceChildren(el('tr', {}, el('th', { text: 'id' }), el('th', { text: 'category' }), ...cols.map((c) => el('th', { text: c }))));
   table.tBodies[0].replaceChildren(...rows.map((m) => el('tr', {},
     el('td', { class: 'mono', text: m.id }),
@@ -324,56 +318,41 @@ const handlers = {
   },
 
   async decision(form, out) {
-    const question = form.elements.question.value.trim();
-    const options = lines(form.elements.options.value);
-    if (options.length < 2) throw new Error('Give at least two options.');
-    const mode = form.elements.mode.value;
-    const wantReasoning = form.elements.reasoning.checked;
+    const raw = form.elements.state.value.trim();
+    let stateValue = raw;
+    if (/^[[{]/.test(raw)) { try { stateValue = JSON.parse(raw); } catch { /* send as text */ } }
+    const image = form.elements.image.files[0];
+    if (image) stateValue = [stateValue, { type: 'image_url', image_url: { url: await fileToDataUrl(image) } }];
 
-    const properties = {
-      decision: { type: 'string', enum: options, description: 'The chosen option, verbatim.' },
-      confidence: { type: 'number', description: 'Confidence between 0 and 1.' },
-    };
-    if (wantReasoning) properties.reasoning = { type: 'string', description: 'One or two sentences explaining the choice.' };
-    const schema = { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+    const questions = {};
+    for (const row of $$('.question', form)) {
+      const id = $('.qid', row).value.trim();
+      if (!id) continue;
+      const type = $('.qtype', row).value;
+      const q = { type };
+      const instr = $('.qinstr', row).value.trim();
+      if (instr) q.instructions = instr;
+      const crit = lines($('.qcriteria', row).value);
+      if (type === 'choice') {
+        q.criteria = Object.fromEntries(crit.map((l) => {
+          const i = l.indexOf(':');
+          return i < 0 ? [l, null] : [l.slice(0, i).trim(), l.slice(i + 1).trim() || null];
+        }));
+      } else if (type === 'score') q.criteria = crit;
+      questions[id] = q;
+    }
+    if (!Object.keys(questions).length) throw new Error('Add at least one question with an id.');
 
-    const system = [
-      'You are a decision engine. Choose exactly one option from the list that best answers the question.',
-      `Options: ${options.map((o) => JSON.stringify(o)).join(', ')}.`,
-      `Respond ONLY with a JSON object of the form ${JSON.stringify(Object.fromEntries(Object.keys(properties).map((k) => [k, k === 'confidence' ? 0.0 : '...'])))}.`,
-      'The "decision" value must be copied verbatim from the options.',
-    ].join('\n');
-
-    const body = compact({
-      model: chosenModel(form),
-      messages: [{ role: 'system', content: system }, { role: 'user', content: question }],
-      temperature: num(form, 'temperature'),
-      response_format: mode === 'json_schema'
-        ? { type: 'json_schema', json_schema: { name: 'decision', strict: true, schema } }
-        : mode === 'json_object' ? { type: 'json_object' } : undefined,
-    });
+    const body = { model: chosenModel(form), state: stateValue, questions };
     const resp = await callApi(ENDPOINT.decision, { json: body });
     let rendered;
-    if (resp.ok && resp.data?.choices) {
-      const choice = resp.data.choices[0] || {};
-      const text = messageText(choice.message || {});
-      const parsed = parseJsonLoose(text);
-      const chosen = parsed?.decision;
-      const valid = options.includes(chosen);
-      const conf = Number(parsed?.confidence);
+    if (resp.ok && resp.data?.answers) {
       rendered = el('div', {},
-        el('div', { class: 'decision-options' }, ...options.map((o) => el('span', { class: o === chosen ? 'chosen' : '', text: o }))),
-        parsed
-          ? el('div', { class: 'output' },
-            el('div', {}, el('strong', { text: 'Decision: ' }), String(chosen ?? '(missing)'), valid ? '' : '  ⚠ not one of the options'),
-            Number.isFinite(conf) ? el('div', {}, el('strong', { text: 'Confidence: ' }), `${(conf * 100).toFixed(0)}% `,
-              el('span', { class: 'meter' }, el('div', { style: `width:${Math.max(0, Math.min(1, conf)) * 100}%` }))) : null,
-            parsed.reasoning ? el('div', {}, el('strong', { text: 'Reasoning: ' }), parsed.reasoning) : null)
-          : el('div', { class: 'output error', text: `Could not parse JSON from the reply:\n\n${text}` }),
-        el('div', { class: 'muted small', text: usageLine(resp.data, choice) }),
-      );
+        ...Object.entries(resp.data.answers).map(([id, a]) => renderAnswer(id, a, questions[id])),
+        el('div', { class: 'muted small', text: usageLine(resp.data) }));
     }
-    renderResult(out, { resp, request: body, curl: curlFor(ENDPOINT.decision, { json: body }), rendered });
+    const shownReq = image ? { ...body, state: [body.state[0], { type: 'image_url', image_url: { url: `<${image.name} as base64 data URL>` } }] } : body;
+    renderResult(out, { resp, request: shownReq, curl: curlFor(ENDPOINT.decision, { json: shownReq }), rendered });
   },
 
   async embeddings(form, out) {
@@ -408,18 +387,19 @@ const handlers = {
   async image(form, out) {
     const body = compact({
       model: chosenModel(form), prompt: form.elements.prompt.value.trim(),
-      size: str(form, 'size'), n: num(form, 'n'), quality: str(form, 'quality'), response_format: str(form, 'response_format'),
+      size: str(form, 'size'), n: num(form, 'n'), quality: str(form, 'quality'),
+      background: str(form, 'background'), output_format: str(form, 'output_format'),
     });
     const resp = await callApi(ENDPOINT.image, { json: body });
     let rendered;
     if (resp.ok && Array.isArray(resp.data?.data)) {
       rendered = el('div', { class: 'output' }, ...resp.data.data.map((img, i) => {
-        const src = img.b64_json ? `data:image/png;base64,${img.b64_json}` : img.url;
+        const src = img.b64_json ? `data:image/${body.output_format || 'png'};base64,${img.b64_json}` : img.url;
         return el('div', {},
           src ? el('img', { src, alt: `Generated image ${i + 1}` }) : el('div', { text: '(no image data)' }),
           img.revised_prompt ? el('div', { class: 'muted small', text: `Revised prompt: ${img.revised_prompt}` }) : null,
-          src ? el('a', { href: src, download: `image-${i + 1}.png`, target: '_blank', text: 'Download / open' }) : null);
-      }));
+          src ? el('a', { href: src, download: `image-${i + 1}.${body.output_format || 'png'}`, target: '_blank', text: 'Download / open' }) : null);
+      }), resp.data.usage ? el('div', { class: 'muted small', text: `usage: ${JSON.stringify(resp.data.usage)}` }) : null);
     }
     const shown = resp.ok && Array.isArray(resp.data?.data)
       ? { ...resp, data: { ...resp.data, data: resp.data.data.map((d) => (d.b64_json ? { ...d, b64_json: `<${d.b64_json.length.toLocaleString()} base64 chars>` } : d)) } }
@@ -448,10 +428,7 @@ const handlers = {
   async transcription(form, out) {
     const file = form.elements.file.files[0] || form._recording;
     if (!file) throw new Error('Choose an audio file or record one.');
-    const fields = compact({
-      model: chosenModel(form), language: str(form, 'language'), prompt: str(form, 'prompt'),
-      response_format: str(form, 'response_format'), temperature: num(form, 'temperature'),
-    });
+    const fields = compact({ model: chosenModel(form), language: str(form, 'language') });
     const fd = new FormData();
     fd.append('file', file, file.name || 'recording.webm');
     for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
@@ -461,8 +438,6 @@ const handlers = {
       const text = typeof resp.data === 'string' ? resp.data : resp.data?.text;
       rendered = el('div', {},
         el('div', { class: 'output', text: text ?? '(no text field – see raw response)' }),
-        resp.data?.segments ? el('details', {}, el('summary', { text: `Segments (${resp.data.segments.length})` }),
-          pre(resp.data.segments.map((s) => `[${fmtTime(s.start)} → ${fmtTime(s.end)}] ${s.text}`).join('\n'))) : null,
         resp.data?.usage ? el('div', { class: 'muted small', text: `usage: ${JSON.stringify(resp.data.usage)}` }) : null,
       );
     }
@@ -482,11 +457,13 @@ function messageText(msg) {
 }
 function usageLine(data, choice) {
   const parts = [];
-  if (data?.model) parts.push(`model: ${data.model}`);
+  if (data?.model) parts.push(`model: ${data.provider ? `${data.provider}/` : ''}${data.model}`);
   if (choice?.finish_reason) parts.push(`finish: ${choice.finish_reason}`);
   const u = data?.usage;
   if (u) {
     if (u.prompt_tokens != null) parts.push(`prompt ${u.prompt_tokens}`);
+    if (u.input_tokens != null) parts.push(`input ${u.input_tokens}`);
+    if (u.output_tokens != null) parts.push(`output ${u.output_tokens}`);
     if (u.completion_tokens != null) parts.push(`completion ${u.completion_tokens}`);
     if (u.total_tokens != null) parts.push(`total ${u.total_tokens} tokens`);
     if (u.cost != null) parts.push(`cost $${u.cost}`);
@@ -525,7 +502,67 @@ function similarityTable(vectors, inputs) {
         })))))));
 }
 const truncate = (s = '', n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-const fmtTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+
+const pct = (x) => `${(Number(x) * 100).toFixed(0)}%`;
+const meter = (x) => el('span', { class: 'meter' }, el('div', { style: `width:${Math.max(0, Math.min(1, Number(x))) * 100}%` }));
+
+function renderAnswer(id, a, q) {
+  const head = el('div', {}, el('strong', { text: id }), el('span', { class: 'cat', text: a.type }));
+  const box = el('div', { class: 'output answer' }, head);
+  if (a.type === 'refusal') {
+    box.classList.add('error');
+    box.append(el('div', { text: a.refusal || a.reason || a.message || 'The model refused to answer.' }));
+  } else if (a.type === 'noul') {
+    box.append(el('div', {}, `P(true) = ${pct(a.noul)} `, meter(a.noul)));
+  } else if (a.type === 'choice') {
+    const probs = a.probabilities || {};
+    const opts = Object.keys(probs).length ? Object.keys(probs) : Object.keys(q?.criteria || {});
+    box.append(el('div', { class: 'decision-options' }, ...opts.map((o) => el('span', { class: o === a.choice ? 'chosen' : '', text: probs[o] != null ? `${o} · ${pct(probs[o])}` : o }))));
+    if (a.confidence != null) box.append(el('div', {}, `confidence ${pct(a.confidence)} `, meter(a.confidence)));
+  } else if (a.type === 'score') {
+    const labels = Array.isArray(q?.criteria) ? q.criteria : [];
+    const max = Math.max(labels.length - 1, 1);
+    const nearest = labels[Math.round(Number(a.score))];
+    box.append(el('div', {}, `score ${Number(a.score).toFixed(2)} / ${max}${nearest ? ` (≈ ${nearest})` : ''} `, meter(Number(a.score) / max)));
+    if (a.confidence != null) box.append(el('div', {}, `confidence ${pct(a.confidence)} `, meter(a.confidence)));
+    if (Array.isArray(a.probabilities)) {
+      box.append(el('div', { class: 'score-dist' }, ...a.probabilities.map((p) => el('div', {},
+        el('span', { class: 'small', text: `${p.value}${labels[p.value] ? ` ${labels[p.value]}` : ''}` }), meter(p.probability), el('span', { class: 'small muted', text: ` ${pct(p.probability)}` })))));
+    }
+  } else {
+    box.append(pre(a));
+  }
+  return box;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+const CRITERIA_HINT = {
+  noul: 'Not used for noul questions',
+  choice: 'One option per line, optionally "option: description"',
+  score: 'Scale labels, one per line, lowest first',
+};
+function addQuestion(form, { id = '', type = 'noul', instructions = '', criteria = '' } = {}) {
+  const node = $('#question-row').content.firstElementChild.cloneNode(true);
+  const typeSel = $('.qtype', node);
+  const crit = $('.qcriteria', node);
+  $('.qid', node).value = id;
+  typeSel.value = type;
+  $('.qinstr', node).value = instructions;
+  crit.value = criteria;
+  const sync = () => { crit.placeholder = CRITERIA_HINT[typeSel.value]; crit.hidden = typeSel.value === 'noul'; };
+  typeSel.addEventListener('change', sync);
+  sync();
+  $('.remove', node).addEventListener('click', () => node.remove());
+  $('.questions', form).append(node);
+}
 
 function addMessage(form, role = 'user', content = '') {
   const node = $('#message-row').content.firstElementChild.cloneNode(true);
@@ -598,6 +635,11 @@ function init() {
   addMessage(chatForm, 'user', 'Say hello and tell me which model you are.');
   $('.add-message', chatForm).addEventListener('click', () => addMessage(chatForm));
   setupRecorder($('form[data-kind=transcription]'));
+  const decisionForm = $('form[data-kind=decision]');
+  addQuestion(decisionForm, { id: 'positive', type: 'noul', instructions: 'The review is positive.' });
+  addQuestion(decisionForm, { id: 'genre', type: 'choice', instructions: 'Which genre is the book?', criteria: 'fantasy: Magic, myth or invented worlds\nmystery: A crime or puzzle to solve\nromance: A love story' });
+  addQuestion(decisionForm, { id: 'rating', type: 'score', instructions: 'How much did the reviewer enjoy the book?', criteria: 'Hated it\nDisliked it\nNeutral\nLiked it\nLoved it' });
+  $('.add-question', decisionForm).addEventListener('click', () => addQuestion(decisionForm));
 
   $$('form.request-form').forEach((form) => form.addEventListener('submit', async (e) => {
     e.preventDefault();

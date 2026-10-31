@@ -57,25 +57,17 @@
   <!-- DECISION -->
   <section class="panel" data-panel="decision">
     <form class="request-form" data-kind="decision">
-      <p class="muted small">Asks a chat model to pick exactly one of your options and return structured JSON
-        (<code>decision</code>, <code>confidence</code>, <code>reasoning</code>).</p>
-      <div class="model-picker" data-category="chat"></div>
-      <label>Question / context
-        <textarea name="question" rows="4" required placeholder="A customer writes: &quot;I was charged twice this month.&quot; Which team should handle this?"></textarea>
+      <p class="muted small">Ask typed questions about a piece of content (<code>POST /v1/decisions</code>) and get a calibrated answer for each one.</p>
+      <div class="model-picker" data-category="decision"></div>
+      <label>State – the content to evaluate (plain text, or JSON)
+        <textarea name="state" rows="4" required>The dragon heist in this fantasy novel had me hooked, but the ending dragged a little.</textarea>
       </label>
-      <label>Options (one per line)
-        <textarea name="options" rows="4" required placeholder="billing&#10;technical support&#10;sales&#10;other"></textarea>
+      <label>Image (optional – only on models that accept images)
+        <input name="image" type="file" accept="image/*">
       </label>
-      <div class="grid3">
-        <label>Output mode
-          <select name="mode">
-            <option value="json_schema">json_schema (strict)</option>
-            <option value="json_object">json_object</option>
-            <option value="prompt">Prompt only</option>
-          </select>
-        </label>
-        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="2" value="0"></label>
-        <label class="inline"><input name="reasoning" type="checkbox" checked> Ask for reasoning</label>
+      <div class="questions"></div>
+      <div class="row">
+        <button type="button" class="secondary add-question">+ Add question</button>
       </div>
       <button type="submit" class="primary">Decide</button>
     </form>
@@ -85,7 +77,7 @@
   <!-- EMBEDDINGS -->
   <section class="panel" data-panel="embeddings">
     <form class="request-form" data-kind="embeddings">
-      <div class="model-picker" data-category="embeddings"></div>
+      <div class="model-picker" data-category="embedding"></div>
       <label>Inputs (one per line – 2+ lines shows a similarity matrix)
         <textarea name="input" rows="5" required placeholder="The cat sat on the mat.&#10;A kitten is resting on a rug.&#10;Stock prices fell sharply today."></textarea>
       </label>
@@ -110,17 +102,19 @@
       <div class="grid3">
         <label>Size
           <select name="size">
-            <option value="">default</option><option>256x256</option><option>512x512</option>
+            <option value="">default</option><option>auto</option>
             <option selected>1024x1024</option><option>1024x1536</option><option>1536x1024</option>
-            <option>1792x1024</option><option>1024x1792</option>
           </select>
         </label>
         <label>Count (n) <input name="n" type="number" min="1" max="10" value="1"></label>
         <label>Quality
-          <select name="quality"><option value="">default</option><option>low</option><option>medium</option><option>high</option><option>standard</option><option>hd</option></select>
+          <select name="quality"><option value="">default</option><option>auto</option><option>low</option><option>medium</option><option>high</option></select>
         </label>
-        <label>Response format
-          <select name="response_format"><option value="">default</option><option>b64_json</option><option>url</option></select>
+        <label>Background
+          <select name="background"><option value="">default</option><option>auto</option><option>transparent</option><option>opaque</option></select>
+        </label>
+        <label>Output format
+          <select name="output_format"><option value="">default</option><option>png</option><option>jpeg</option><option>webp</option></select>
         </label>
       </div>
       <button type="submit" class="primary">Generate</button>
@@ -133,22 +127,21 @@
     <form class="request-form" data-kind="speech">
       <div class="model-picker" data-category="speech"></div>
       <label>Text
-        <textarea name="input" rows="3" required placeholder="Hello! This is a quick text-to-speech test through Requesty."></textarea>
+        <textarea name="input" rows="3" maxlength="4096" required placeholder="Hello! This is a quick text-to-speech test through Requesty."></textarea>
       </label>
       <div class="grid3">
         <label>Voice
-          <input name="voice" list="voices" value="alloy">
-          <datalist id="voices">
-            <option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
+          <select name="voice">
+            <option selected>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option>
             <option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option><option>verse</option>
-          </datalist>
+          </select>
         </label>
         <label>Format
           <select name="response_format"><option>mp3</option><option>wav</option><option>opus</option><option>aac</option><option>flac</option><option>pcm</option></select>
         </label>
         <label>Speed <input name="speed" type="number" step="0.05" min="0.25" max="4" placeholder="1.0"></label>
       </div>
-      <label>Instructions (optional, some models only)
+      <label>Instructions (optional, <code>openai/gpt-4o-mini-tts</code> only)
         <input name="instructions" placeholder="Speak in a cheerful, upbeat tone.">
       </label>
       <button type="submit" class="primary">Speak</button>
@@ -161,21 +154,14 @@
     <form class="request-form" data-kind="transcription">
       <div class="model-picker" data-category="transcription"></div>
       <label>Audio file
-        <input name="file" type="file" accept="audio/*,video/*">
+        <input name="file" type="file" accept=".flac,.mp3,.mp4,.mpeg,.mpga,.m4a,.ogg,.wav,.webm,audio/*">
       </label>
       <div class="row">
         <button type="button" class="secondary record-btn">● Record from mic</button>
         <span class="record-status muted small"></span>
       </div>
-      <div class="grid3">
-        <label>Language <input name="language" placeholder="auto (e.g. en)"></label>
-        <label>Response format
-          <select name="response_format"><option>json</option><option>text</option><option>verbose_json</option><option>srt</option><option>vtt</option></select>
-        </label>
-        <label>Temperature <input name="temperature" type="number" step="0.1" min="0" max="1" placeholder="default"></label>
-      </div>
-      <label>Prompt (optional context / spelling hints)
-        <input name="prompt" placeholder="Requesty, OpenRouter, Anthropic">
+      <label>Language (ISO 639-1, optional)
+        <input name="language" placeholder="auto-detect (e.g. en, fr, ja)">
       </label>
       <button type="submit" class="primary">Transcribe</button>
     </form>
@@ -195,6 +181,22 @@
     </details>
   </section>
 </main>
+
+<template id="question-row">
+  <fieldset class="question">
+    <div class="row">
+      <input class="qid" placeholder="id" spellcheck="false" size="10">
+      <select class="qtype">
+        <option value="noul">noul – yes/no probability</option>
+        <option value="choice">choice – pick one option</option>
+        <option value="score">score – ordered scale</option>
+      </select>
+      <button type="button" class="icon remove" title="Remove">✕</button>
+    </div>
+    <input class="qinstr" placeholder="Instructions, e.g. The review is positive.">
+    <textarea class="qcriteria mono" rows="3"></textarea>
+  </fieldset>
+</template>
 
 <template id="message-row">
   <div class="message">

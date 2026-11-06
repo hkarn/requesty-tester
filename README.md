@@ -1,6 +1,6 @@
 # Requesty Tester
 
-A web page for trying out [Requesty](https://requesty.ai), a router that puts many AI providers behind one API key. Pick a model, fill in a short form, send it, and see exactly what came back: the rendered answer, the raw JSON, the headers and a ready-to-run `curl` command. It covers chat, decisions, embeddings, image generation, text-to-speech and speech-to-text.
+A web page for trying out [Requesty](https://requesty.ai), a router that puts many AI providers behind one API key. Pick a model, fill in a short form, send it, and see exactly what came back: the rendered answer, the raw JSON, the headers and a ready-to-run `curl` command. It covers chat, decisions, embeddings, image generation and editing, text-to-speech and speech-to-text.
 
 **Try it at <https://hkarn.github.io/requesty-tester/>.** You need a Requesty API key. If you don't have one, you can [sign up through my referral link](https://app.requesty.ai/join?ref=b1f2b1e1) or directly at [requesty.ai](https://requesty.ai).
 
@@ -25,6 +25,7 @@ In both modes the key stays in that browser tab, unless you tick **Remember**, w
 | **Decision** | `POST /v1/decisions` | Content (`state`, optionally with an image) plus typed questions (`noul` yes/no, `choice`, `score`), with calibrated answers and probability bars |
 | **Embeddings** | `POST /v1/embeddings` | One input per line, shows vector previews and a cosine-similarity matrix |
 | **Image** | `POST /v1/images/generations` | Size, n, quality, background and output format. Renders the returned images |
+| **Image edit** | `POST /v1/images/edits` | Up to 16 reference images (sent as repeated `image[]` multipart fields), an optional mask, size and quality. Renders the returned images |
 | **Speech** | `POST /v1/audio/speech` | Plays the audio in the browser and lets you download it |
 | **Transcriptions** | `POST /v1/audio/transcriptions` | Upload a file (≤ 32 MB) or record from your mic, with optional language |
 | **All models** | `GET /v1/models/all` | Searchable table plus the raw response |

@@ -663,6 +663,17 @@ function setupRefImages(form) {
     if (picked.length > room) count.textContent += ` (skipped ${picked.length - room}: the limit is ${MAX_EDIT_IMAGES})`;
   });
   $('.clear-images', form).addEventListener('click', () => { form._refImages = []; render(); });
+
+  // A file input can't be emptied from its own dialog, so the mask gets a clear button.
+  const mask = form.elements.mask;
+  const maskRow = $('.mask-row', form);
+  const syncMask = () => {
+    const f = mask.files[0];
+    maskRow.hidden = !f;
+    $('.mask-status', form).textContent = f ? `Mask: ${f.name} (${(f.size / 1024).toFixed(1)} KB)` : '';
+  };
+  mask.addEventListener('change', syncMask);
+  $('.clear-mask', form).addEventListener('click', () => { mask.value = ''; syncMask(); });
 }
 
 function fileToDataUrl(file) {

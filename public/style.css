@@ -90,6 +90,7 @@ button.icon { padding: 4px 8px; background: none; }
 button:disabled { opacity: .6; cursor: progress; }
 
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row[hidden] { display: none; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; align-items: end; }
 
 .model-picker, .voice-picker { display: flex; flex-direction: column; gap: 6px; }

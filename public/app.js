@@ -21,7 +21,7 @@ const CATEGORY_LABEL = {
 };
 const ENDPOINT = {
   chat: '/chat/completions', decision: '/decisions', embeddings: '/embeddings',
-  image: '/images/generations', speech: '/audio/speech', transcription: '/audio/transcriptions',
+  image: '/images/generations', imageEdit: '/images/edits', speech: '/audio/speech', transcription: '/audio/transcriptions',
 };
 
 const state = {
@@ -461,20 +461,32 @@ const handlers = {
       background: str(form, 'background'), output_format: str(form, 'output_format'),
     });
     const resp = await callApi(ENDPOINT.image, { json: body });
-    let rendered;
-    if (resp.ok && Array.isArray(resp.data?.data)) {
-      rendered = el('div', { class: 'output' }, ...resp.data.data.map((img, i) => {
-        const src = img.b64_json ? `data:image/${body.output_format || 'png'};base64,${img.b64_json}` : img.url;
-        return el('div', {},
-          src ? el('img', { src, alt: `Generated image ${i + 1}` }) : el('div', { text: '(no image data)' }),
-          img.revised_prompt ? el('div', { class: 'muted small', text: `Revised prompt: ${img.revised_prompt}` }) : null,
-          src ? el('a', { href: src, download: `image-${i + 1}.${body.output_format || 'png'}`, target: '_blank', text: 'Download / open' }) : null);
-      }), resp.data.usage ? el('div', { class: 'muted small', text: `usage: ${JSON.stringify(resp.data.usage)}` }) : null);
-    }
-    const shown = resp.ok && Array.isArray(resp.data?.data)
-      ? { ...resp, data: { ...resp.data, data: resp.data.data.map((d) => (d.b64_json ? { ...d, b64_json: `<${d.b64_json.length.toLocaleString()} base64 chars>` } : d)) } }
-      : resp;
+    const { rendered, shown } = renderImages(resp, body.output_format);
     renderResult(out, { resp: shown, request: body, curl: curlFor(ENDPOINT.image, { json: body }), rendered });
+  },
+
+  // Multipart, with one image[] field per reference image (up to 16 for GPT image models).
+  async imageEdit(form, out) {
+    const images = form._refImages || [];
+    if (!images.length) throw new Error('Add at least one reference image.');
+    if (images.length > MAX_EDIT_IMAGES) throw new Error(`At most ${MAX_EDIT_IMAGES} reference images.`);
+    const mask = form.elements.mask.files[0];
+    const fields = compact({
+      model: chosenModel(form), prompt: form.elements.prompt.value.trim(),
+      size: str(form, 'size'), quality: str(form, 'quality'),
+    });
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
+    for (const img of images) fd.append('image[]', img, img.name);
+    if (mask) fd.append('mask', mask, mask.name);
+    const resp = await callApi(ENDPOINT.imageEdit, { formData: fd });
+    const { rendered, shown } = renderImages(resp);
+    const describe = (f) => `${f.name} (${f.type || 'unknown type'}, ${(f.size / 1024).toFixed(1)} KB)`;
+    const request = { ...fields, 'image[]': images.map(describe), ...(mask ? { mask: describe(mask) } : {}) };
+    const curl = curlFor(ENDPOINT.imageEdit, { formFields: [
+      ...Object.entries(fields), ...images.map((f) => ['image[]', `@${f.name}`]), ...(mask ? [['mask', `@${mask.name}`]] : []),
+    ] });
+    renderResult(out, { resp: shown, request, curl, rendered });
   },
 
   async speech(form, out) {
@@ -610,6 +622,49 @@ function renderAnswer(id, a, q) {
   return box;
 }
 
+// Shared by image generation and edits. `shown` shortens b64_json for the raw view.
+function renderImages(resp, format = 'png') {
+  if (!resp.ok || !Array.isArray(resp.data?.data)) return { rendered: undefined, shown: resp };
+  const rendered = el('div', { class: 'output' }, ...resp.data.data.map((img, i) => {
+    const src = img.b64_json ? `data:image/${format};base64,${img.b64_json}` : img.url;
+    return el('div', {},
+      src ? el('img', { src, alt: `Generated image ${i + 1}` }) : el('div', { text: '(no image data)' }),
+      img.revised_prompt ? el('div', { class: 'muted small', text: `Revised prompt: ${img.revised_prompt}` }) : null,
+      src ? el('a', { href: src, download: `image-${i + 1}.${format}`, target: '_blank', text: 'Download / open' }) : null);
+  }), resp.data.usage ? el('div', { class: 'muted small', text: `usage: ${JSON.stringify(resp.data.usage)}` }) : null);
+  const shown = { ...resp, data: { ...resp.data, data: resp.data.data.map((d) => (d.b64_json ? { ...d, b64_json: `<${d.b64_json.length.toLocaleString()} base64 chars>` } : d)) } };
+  return { rendered, shown };
+}
+
+/* ------------------------------------------------------------------ */
+/* Reference images for image edits                                    */
+/* ------------------------------------------------------------------ */
+const MAX_EDIT_IMAGES = 16;
+// Files from several picks add up, so images can come from different folders.
+function setupRefImages(form) {
+  const input = form.elements.images;
+  const grid = $('.ref-images', form);
+  const count = $('.ref-count', form);
+  form._refImages = [];
+  const render = () => {
+    grid.replaceChildren(...form._refImages.map((f, i) => el('figure', { title: f.name },
+      el('img', { src: URL.createObjectURL(f), alt: f.name, onload: (e) => URL.revokeObjectURL(e.target.src) }),
+      el('button', { type: 'button', class: 'secondary', title: 'Remove', text: '×', onclick: () => { form._refImages.splice(i, 1); render(); } }),
+      el('figcaption', { text: `${i + 1}. ${f.name}` }))));
+    const n = form._refImages.length;
+    count.textContent = n ? `${n} of ${MAX_EDIT_IMAGES} images` : 'No images chosen.';
+  };
+  input.addEventListener('change', () => {
+    const room = MAX_EDIT_IMAGES - form._refImages.length;
+    const picked = [...input.files];
+    form._refImages.push(...picked.slice(0, room));
+    input.value = '';
+    render();
+    if (picked.length > room) count.textContent += ` (skipped ${picked.length - room}: the limit is ${MAX_EDIT_IMAGES})`;
+  });
+  $('.clear-images', form).addEventListener('click', () => { form._refImages = []; render(); });
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -724,6 +779,7 @@ function init() {
   $('.add-message', chatForm).addEventListener('click', () => addMessage(chatForm));
   setupRecorder($('form[data-kind=transcription]'));
   setupVoicePicker($('form[data-kind=speech]'));
+  setupRefImages($('form[data-kind=imageEdit]'));
   const decisionForm = $('form[data-kind=decision]');
   addQuestion(decisionForm, { id: 'positive', type: 'noul', instructions: 'The review is positive.' });
   addQuestion(decisionForm, { id: 'genre', type: 'choice', instructions: 'Which genre is the book?', criteria: 'fantasy: Magic, myth or invented worlds\nmystery: A crime or puzzle to solve\nromance: A love story' });

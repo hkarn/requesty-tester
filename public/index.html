@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Requesty Tester</title>
-  <meta name="description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, images, speech and transcriptions. Bring your own API key.">
+  <meta name="description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, image generation and editing, speech and transcriptions. Bring your own API key.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Requesty Tester">
   <meta property="og:title" content="Requesty Tester">
-  <meta property="og:description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, images, speech and transcriptions. Bring your own API key.">
+  <meta property="og:description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, image generation and editing, speech and transcriptions. Bring your own API key.">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Requesty Tester">
-  <meta name="twitter:description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, images, speech and transcriptions. Bring your own API key.">
+  <meta name="twitter:description" content="Send test requests to the Requesty router and inspect the full response: chat, decisions, embeddings, image generation and editing, speech and transcriptions. Bring your own API key.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -35,6 +35,7 @@
   <button role="tab" data-tab="decision">Decision</button>
   <button role="tab" data-tab="embeddings">Embeddings</button>
   <button role="tab" data-tab="image">Image</button>
+  <button role="tab" data-tab="image-edit">Image edit</button>
   <button role="tab" data-tab="speech">Speech</button>
   <button role="tab" data-tab="transcription">Transcriptions</button>
   <button role="tab" data-tab="models">All models</button>
@@ -130,6 +131,41 @@
         </label>
       </div>
       <button type="submit" class="primary">Generate</button>
+    </form>
+    <div class="result"></div>
+  </section>
+
+  <!-- IMAGE EDIT -->
+  <section class="panel" data-panel="image-edit">
+    <form class="request-form" data-kind="imageEdit">
+      <p class="muted small">Edit or combine images from a prompt (<code>POST /v1/images/edits</code>). GPT image models take up to 16 reference images.</p>
+      <div class="model-picker" data-category="image"></div>
+      <label>Prompt
+        <textarea name="prompt" rows="3" required>Combine these into one photo of the items arranged on a wooden table</textarea>
+      </label>
+      <label>Reference images (up to 16)
+        <input name="images" type="file" accept="image/*" multiple>
+      </label>
+      <div class="ref-images"></div>
+      <div class="row">
+        <span class="ref-count muted small">No images chosen.</span>
+        <button type="button" class="secondary clear-images">Clear images</button>
+      </div>
+      <label>Mask (optional – transparent pixels mark the area to regenerate)
+        <input name="mask" type="file" accept="image/png">
+      </label>
+      <div class="grid3">
+        <label>Size
+          <select name="size">
+            <option value="">default</option><option>auto</option>
+            <option>1024x1024</option><option>1024x1536</option><option>1536x1024</option>
+          </select>
+        </label>
+        <label>Quality
+          <select name="quality"><option value="">default</option><option>auto</option><option>low</option><option>medium</option><option>high</option></select>
+        </label>
+      </div>
+      <button type="submit" class="primary">Edit</button>
     </form>
     <div class="result"></div>
   </section>

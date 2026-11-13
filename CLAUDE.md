@@ -9,6 +9,7 @@ A small web UI for testing Requesty router endpoints. Live at https://hkarn.gith
 - The UI is plain JS in `public/app.js`, with one handler per tab in `handlers`.
 - The API source of truth is `docs/requesty-inference-openapi.json`. Check request and response formats there before changing a handler.
 - Keep it dependency-free: no build step and no npm packages.
+- Assign every pull request you open to `hkarn`, so it shows up in the owner's GitHub views: `gh pr create --assignee hkarn`, or `gh pr edit <N> --add-assignee hkarn` for one opened another way (a GitHub MCP tool, or a draft the environment opened).
 
 ## Where the live API differs from the spec
 Found by testing with a real key; keep handling both shapes.

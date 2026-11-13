@@ -13,7 +13,7 @@ A small web UI for testing Requesty router endpoints. Live at https://hkarn.gith
 - Open pull requests as drafts; the owner marks them ready for review.
 - Review comments, from Copilot or a person: check each claim against the code first, fix what is real in a new commit, and reply on the thread with what you found and what changed (or why nothing did). Never resolve a conversation; the owner does.
 - Never merge, approve or enable auto-merge on a pull request; the owner's merge is the approval.
-- Sign everything you post on GitHub (pull request descriptions, issues, comments and review replies) with a last line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- Claude Code signs everything it posts on GitHub (pull request descriptions, issues, comments and review replies) with a last line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. This line is Claude Code's alone: Copilot and other reviewers or agents reading this file don't add it.
 
 ## Where the live API differs from the spec
 Found by testing with a real key; keep handling both shapes.

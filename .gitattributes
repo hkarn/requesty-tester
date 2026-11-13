@@ -1,0 +1,24 @@
+# Line endings: store and check out text as LF on every OS, so the same
+# working tree behaves alike on a Windows host and in Linux containers,
+# whatever core.autocrlf is set to.
+* text=auto eol=lf
+
+# Windows batch files need CRLF to run.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries: never convert, diff or merge as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.ogg   binary
+*.mp3   binary
+*.wav   binary
+*.mp4   binary
+*.woff  binary
+*.woff2 binary
+*.zip   binary

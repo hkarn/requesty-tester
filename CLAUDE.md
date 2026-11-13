@@ -10,6 +10,9 @@ A small web UI for testing Requesty router endpoints. Live at https://hkarn.gith
 - The API source of truth is `docs/requesty-inference-openapi.json`. Check request and response formats there before changing a handler.
 - Keep it dependency-free: no build step and no npm packages.
 - Assign every pull request you open to `hkarn`, so it shows up in the owner's GitHub views: `gh pr create --assignee hkarn`, or `gh pr edit <N> --add-assignee hkarn` for one opened another way (a GitHub MCP tool, or a draft the environment opened).
+- Open pull requests as drafts; the owner marks them ready for review.
+- Review comments, from Copilot or a person: check each claim against the code first, fix what is real in a new commit, and reply on the thread with what you found and what changed (or why nothing did). Never resolve a conversation; the owner does.
+- Never merge, approve or enable auto-merge on a pull request; the owner's merge is the approval.
 
 ## Where the live API differs from the spec
 Found by testing with a real key; keep handling both shapes.

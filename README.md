@@ -2,7 +2,7 @@
 
 A web page for trying out [Requesty](https://requesty.ai), a router that puts many AI providers behind one API key. Pick a model, fill in a short form, send it, and see exactly what came back: the rendered answer, the raw JSON, the headers and a ready-to-run `curl` command. It covers chat, decisions, embeddings, image generation and editing, text-to-speech and speech-to-text.
 
-**Try it at <https://hkarn.github.io/requesty-tester/>.** You need a Requesty API key. If you don't have one, you can [sign up through my referral link](https://app.requesty.ai/join?ref=b1f2b1e1) or directly at [requesty.ai](https://requesty.ai).
+**Try it at <https://arnoldson.dev/requesty-tester/>.** You need a Requesty API key. If you don't have one, you can [sign up through my referral link](https://app.requesty.ai/join?ref=b1f2b1e1) or directly at [requesty.ai](https://requesty.ai).
 
 ## Two ways it runs
 

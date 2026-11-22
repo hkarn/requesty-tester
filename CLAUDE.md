@@ -1,6 +1,6 @@
 # Requesty Tester
 
-A small web UI for testing Requesty router endpoints. Live at https://hkarn.github.io/requesty-tester/.
+A small web UI for testing Requesty router endpoints. Live at https://arnoldson.dev/requesty-tester/.
 
 - Run: `node server.js` (Node 18+, no dependencies), then open http://127.0.0.1:3000. Docker: `docker compose up`.
 - `server.js` serves `public/` and proxies `/api/*` to `REQUESTY_BASE_URL` (default `https://router.requesty.ai/v1`).
